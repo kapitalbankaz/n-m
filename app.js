@@ -1,6 +1,6 @@
 /* ============================================================
-   CRM System — Main Application
-   Supabase Static Frontend
+   Menora Nömrələr — CRM System
+   Version 2.0
    ============================================================ */
 
 // ============================================================
@@ -24,11 +24,17 @@ let currentPage = 1;
 const PAGE_SIZE = 20;
 let pendingFileNumbers = [];
 let searchPhoneTimeout = null;
+let currentSection = null;
 
 const STATUSES = [
   'Yeni', 'Danışılır', 'Cavab vermədi', 'Nömrə işləmir',
   'Razı olmadı', 'Gələcəkdə ala bilər', 'Maraqlanır', 'Müştəri oldu'
 ];
+
+// Statuses that mean "contacted"
+const CONTACTED_STATUSES = ['Danışılır', 'Cavab vermədi', 'Nömrə işləmir', 'Razı olmadı', 'Gələcəkdə ala bilər', 'Maraqlanır', 'Müştəri oldu'];
+// Statuses that mean "not contacted" (no real connection established)
+const UNCONTACTED_STATUSES = ['Yeni', 'Cavab vermədi', 'Nömrə işləmir'];
 
 const STATUS_ICONS = {
   'Yeni': 'fas fa-plus-circle',
@@ -40,6 +46,51 @@ const STATUS_ICONS = {
   'Maraqlanır': 'fas fa-star',
   'Müştəri oldu': 'fas fa-user-check'
 };
+
+// Session storage key for last section
+const SESSION_KEY = 'menora_last_section';
+
+// ============================================================
+// PWA INSTALL
+// ============================================================
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show banner only if not dismissed
+  const dismissed = sessionStorage.getItem('pwa_dismissed');
+  if (!dismissed) {
+    setTimeout(() => {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner && currentUser) banner.style.display = 'flex';
+    }, 3000);
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  showToast('Menora Nömrələr quraşdırıldı!', 'success');
+});
+
+function installPWA() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((result) => {
+      deferredPrompt = null;
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.style.display = 'none';
+    });
+  }
+}
+
+function dismissPWABanner() {
+  sessionStorage.setItem('pwa_dismissed', '1');
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+}
 
 // ============================================================
 // INIT
@@ -81,14 +132,32 @@ async function doLogin() {
   errEl.textContent = '';
   if (!email || !pass) { errEl.textContent = 'E-poçt və şifrəni daxil edin.'; return; }
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yüklənir...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Giriş...';
   const { error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.disabled = false;
   btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Daxil ol';
   if (error) { errEl.textContent = 'E-poçt və ya şifrə yanlışdır.'; }
 }
 
+// Enter key login
+document.addEventListener('DOMContentLoaded', () => {
+  const passInput = document.getElementById('loginPassword');
+  if (passInput) {
+    passInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+  }
+  const emailInput = document.getElementById('loginEmail');
+  if (emailInput) {
+    emailInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+  }
+});
+
 async function doLogout() {
+  // Clear session storage on logout
+  sessionStorage.removeItem(SESSION_KEY);
   await sb.auth.signOut();
 }
 
@@ -122,11 +191,34 @@ function showAppPage() {
   document.getElementById('userInfoSidebar').textContent = `${name} (${isAdmin ? 'Admin' : 'İşçi'})`;
   document.getElementById('topUserName').textContent = name;
 
+  // Restore last section from session storage
+  const lastSection = sessionStorage.getItem(SESSION_KEY);
+
   if (isAdmin) {
-    showSection('dashboard');
     loadAllWorkers();
+    // Validate saved section belongs to admin
+    const adminSections = ['dashboard', 'numbers', 'workers', 'import', 'distribute'];
+    if (lastSection && adminSections.includes(lastSection)) {
+      showSection(lastSection);
+    } else {
+      showSection('dashboard');
+    }
   } else {
-    showSection('myNumbers');
+    // Validate saved section belongs to worker
+    const workerSections = ['myNumbers', 'reminders'];
+    if (lastSection && workerSections.includes(lastSection)) {
+      showSection(lastSection);
+    } else {
+      showSection('myNumbers');
+    }
+  }
+
+  // Show PWA install banner after delay if prompt available
+  if (deferredPrompt && !sessionStorage.getItem('pwa_dismissed')) {
+    setTimeout(() => {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.style.display = 'flex';
+    }, 3000);
   }
 }
 
@@ -148,7 +240,7 @@ function showSection(name) {
     document.getElementById(sectionId).classList.remove('hidden');
   }
 
-  // Update active nav
+  // Update active nav - remove active from all, add to clicked
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.page === name);
   });
@@ -163,6 +255,10 @@ function showSection(name) {
 
   closeSidebar();
 
+  // Save current section to session storage
+  currentSection = name;
+  sessionStorage.setItem(SESSION_KEY, name);
+
   // Load data
   if (name === 'dashboard') loadDashboard();
   else if (name === 'numbers') loadAdminNumbers();
@@ -170,6 +266,16 @@ function showSection(name) {
   else if (name === 'distribute') loadDistributeInfo();
   else if (name === 'myNumbers') loadMyNumbers();
   else if (name === 'reminders') loadReminders();
+}
+
+// Refresh current section
+function refreshCurrentSection() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) {
+    btn.querySelector('i').classList.add('fa-spin');
+    setTimeout(() => btn.querySelector('i').classList.remove('fa-spin'), 1000);
+  }
+  if (currentSection) showSection(currentSection);
 }
 
 // ============================================================
@@ -188,7 +294,6 @@ function closeSidebar() {
 // DASHBOARD
 // ============================================================
 async function loadDashboard() {
-  // Load stats
   const { data: nums } = await sb.from('phone_numbers').select('status, assigned_to');
   if (!nums) return;
 
@@ -206,10 +311,7 @@ async function loadDashboard() {
   document.getElementById('statNoAnswer').textContent = counts['Cavab vermədi'];
   document.getElementById('statInvalid').textContent = counts['Nömrə işləmir'];
 
-  // Worker stats
   await loadWorkerStats();
-
-  // Reminders
   await loadDashboardReminders();
 }
 
@@ -224,7 +326,7 @@ async function loadWorkerStats() {
   let html = '';
   workers.forEach(w => {
     const myNums = numbers ? numbers.filter(n => n.assigned_to === w.id) : [];
-    const contacted = myNums.filter(n => n.status !== 'Yeni').length;
+    const contacted = myNums.filter(n => CONTACTED_STATUSES.includes(n.status)).length;
     const customer = myNums.filter(n => n.status === 'Müştəri oldu').length;
     const interested = myNums.filter(n => n.status === 'Maraqlanır').length;
     const future = myNums.filter(n => n.status === 'Gələcəkdə ala bilər').length;
@@ -334,8 +436,9 @@ function renderAdminNumbers() {
       <td>${n.next_contact_date ? `<span style="color:var(--warning);font-size:0.8rem"><i class="fas fa-calendar"></i> ${formatDate(n.next_contact_date)}</span>` : '—'}</td>
       <td style="color:var(--gray-400);font-size:0.8rem">${formatDateTime(n.created_at)}</td>
       <td>
-        <button class="btn btn-ghost btn-xs" onclick="openNumberDetail('${n.id}')"><i class="fas fa-eye"></i></button>
-        <button class="btn btn-ghost btn-xs" onclick="openAssignModal('${n.id}','${escHtml(n.phone_display)}')"><i class="fas fa-user-plus"></i></button>
+        <button class="btn btn-ghost btn-xs" onclick="openNumberDetail('${n.id}')" title="Detal"><i class="fas fa-eye"></i></button>
+        <button class="btn btn-ghost btn-xs" onclick="openAssignModal('${n.id}','${escHtml(n.phone_display)}')" title="Təyin et"><i class="fas fa-user-plus"></i></button>
+        <button class="btn btn-danger btn-xs" onclick="confirmDeleteNumber('${n.id}','${escHtml(n.phone_display)}')" title="Sil"><i class="fas fa-trash"></i></button>
       </td>
     </tr>`;
   });
@@ -344,13 +447,22 @@ function renderAdminNumbers() {
   renderPagination('numbersPagination', filteredNumbers.length, currentPage, (p) => { currentPage = p; renderAdminNumbers(); });
 }
 
+// Delete number
+function confirmDeleteNumber(id, phone) {
+  showConfirm(`"${phone}" nömrəsini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`, async () => {
+    const { error } = await sb.from('phone_numbers').delete().eq('id', id);
+    if (error) { showToast('Silmə xətası: ' + error.message, 'error'); return; }
+    showToast('Nömrə silindi.', 'success');
+    loadAdminNumbers();
+  }, 'Nömrəni Sil');
+}
+
 // ============================================================
 // WORKERS (Admin)
 // ============================================================
 async function loadAllWorkers() {
   const { data } = await sb.from('profiles').select('*').eq('role', 'worker');
   allWorkers = data || [];
-  // Populate manual assign dropdown
   const sel = document.getElementById('manualWorker');
   sel.innerHTML = '<option value="">İşçi seçin...</option>';
   allWorkers.forEach(w => {
@@ -375,8 +487,8 @@ async function loadWorkers() {
       <td>${escHtml(w.email)}</td>
       <td><span class="badge badge-primary">${countMap[w.id] || 0}</span></td>
       <td>
-        <button class="btn btn-ghost btn-xs" onclick="confirmDeleteWorker('${w.id}','${escHtml(w.full_name || w.email)}')">
-          <i class="fas fa-trash"></i>
+        <button class="btn btn-danger btn-xs" onclick="confirmDeleteWorker('${w.id}','${escHtml(w.full_name || w.email)}')">
+          <i class="fas fa-trash"></i> Sil
         </button>
       </td>
     </tr>`;
@@ -398,34 +510,61 @@ async function doAddWorker() {
   const email = document.getElementById('workerEmail').value.trim();
   const pass = document.getElementById('workerPass').value;
   const errEl = document.getElementById('addWorkerError');
+  const btn = document.getElementById('addWorkerBtn');
   errEl.textContent = '';
   if (!name || !email || !pass) { errEl.textContent = 'Bütün sahələri doldurun.'; return; }
   if (pass.length < 6) { errEl.textContent = 'Şifrə minimum 6 simvol olmalıdır.'; return; }
 
-  // Create user via Supabase Admin API using service role
-  // We use a workaround: sign up with metadata
-  const { data, error } = await sb.auth.admin ? 
-    sb.auth.admin.createUser({ email, password: pass, email_confirm: true, user_metadata: { full_name: name, role: 'worker' } }) :
-    { data: null, error: { message: 'Admin API mövcud deyil' } };
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Əlavə edilir...';
 
-  if (error) {
-    // Fallback: try regular signup (user will need to confirm email)
-    const { error: signupErr } = await sb.auth.signUp({
-      email, password: pass,
-      options: { data: { full_name: name, role: 'worker' } }
+  try {
+    // Step 1: Sign up the new worker
+    const { data: signupData, error: signupErr } = await sb.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: { full_name: name, role: 'worker' }
+      }
     });
-    if (signupErr) { errEl.textContent = signupErr.message; return; }
-    showToast('İşçi qeydiyyatdan keçirildi. Email təsdiqləməsi lazım ola bilər.', 'warning');
-  } else {
-    showToast('İşçi uğurla əlavə edildi!', 'success');
+
+    if (signupErr) {
+      errEl.textContent = signupErr.message;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-user-plus"></i> Əlavə et';
+      return;
+    }
+
+    // Step 2: Upsert profile for the new user
+    if (signupData && signupData.user) {
+      const { error: profileErr } = await sb.from('profiles').upsert({
+        id: signupData.user.id,
+        email: email,
+        full_name: name,
+        role: 'worker'
+      }, { onConflict: 'id' });
+
+      if (profileErr) {
+        console.warn('Profile upsert error:', profileErr);
+      }
+    }
+
+    closeModal('modalAddWorker');
+    showToast(`İşçi "${name}" uğurla əlavə edildi! Email təsdiqi lazım ola bilər.`, 'success');
+    loadWorkers();
+    loadAllWorkers();
+  } catch (e) {
+    errEl.textContent = 'Xəta baş verdi: ' + e.message;
   }
-  closeModal('modalAddWorker');
-  loadWorkers();
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-user-plus"></i> Əlavə et';
 }
 
 function confirmDeleteWorker(id, name) {
   showConfirm(`"${name}" adlı işçini silmək istədiyinizə əminsiniz?`, async () => {
-    await sb.from('profiles').delete().eq('id', id);
+    const { error } = await sb.from('profiles').delete().eq('id', id);
+    if (error) { showToast('Silmə xətası: ' + error.message, 'error'); return; }
     showToast('İşçi silindi.', 'success');
     loadWorkers();
     loadAllWorkers();
@@ -512,12 +651,10 @@ async function importPhones(rawPhones) {
   resultEl.className = 'import-result';
   resultEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> İmport edilir...</div>';
 
-  // Normalize
   const normalized = rawPhones.map(p => normalizePhone(p)).filter(Boolean);
   const unique = [...new Set(normalized)];
   const duplicatesInInput = normalized.length - unique.length;
 
-  // Check existing
   const { data: existing } = await sb.from('phone_numbers').select('phone').in('phone', unique);
   const existingSet = new Set((existing || []).map(n => n.phone));
   const toInsert = unique.filter(p => !existingSet.has(p));
@@ -526,7 +663,6 @@ async function importPhones(rawPhones) {
   let inserted = 0, errors = 0;
   if (toInsert.length) {
     const rows = toInsert.map(p => ({ phone: p, phone_display: formatPhoneDisplay(p), status: 'Yeni' }));
-    // Insert in batches of 100
     for (let i = 0; i < rows.length; i += 100) {
       const batch = rows.slice(i, i + 100);
       const { error } = await sb.from('phone_numbers').insert(batch);
@@ -537,8 +673,7 @@ async function importPhones(rawPhones) {
 
   resultEl.className = 'import-result ' + (errors ? 'error' : 'success');
   resultEl.innerHTML = `
-    <strong><i class="fas fa-check-circle"></i> İmport tamamlandı!</strong><br>
-    <br>
+    <strong><i class="fas fa-check-circle"></i> İmport tamamlandı!</strong><br><br>
     📱 Ümumi nömrə sayı: <strong>${rawPhones.length}</strong><br>
     ✅ Əlavə edildi: <strong>${inserted}</strong><br>
     🔁 Daxiloldə təkrar: <strong>${duplicatesInInput}</strong><br>
@@ -567,7 +702,6 @@ async function loadDistributeInfo() {
     <div class="distribute-stat"><span>Hər işçiyə təxminən</span><strong>${perWorker}</strong></div>
   `;
 
-  // Manual assign workers
   const sel = document.getElementById('manualWorker');
   sel.innerHTML = '<option value="">İşçi seçin...</option>';
   (workers || []).forEach(w => {
@@ -581,14 +715,12 @@ async function doAutoDistribute() {
   if (!unassigned || !unassigned.length) { showToast('Paylaşdırılmamış nömrə yoxdur.', 'warning'); return; }
   if (!workers || !workers.length) { showToast('İşçi tapılmadı.', 'error'); return; }
 
-  // Shuffle numbers
   const shuffled = [...unassigned].sort(() => Math.random() - 0.5);
   const updates = [];
   shuffled.forEach((num, i) => {
     updates.push({ id: num.id, assigned_to: workers[i % workers.length].id });
   });
 
-  // Update in batches
   let done = 0;
   for (const upd of updates) {
     await sb.from('phone_numbers').update({ assigned_to: upd.assigned_to }).eq('id', upd.id);
@@ -657,8 +789,13 @@ async function loadMyNumbers() {
 function applyWorkerFilters() {
   const phone = document.getElementById('myFilterPhone').value.trim().toLowerCase();
   const status = document.getElementById('myFilterStatus').value;
+
   myFilteredNumbers = myNumbers.filter(n => {
     if (phone && !n.phone_display.toLowerCase().includes(phone)) return false;
+    // Special "uncontacted" filter - show numbers with no real contact
+    if (status === '__uncontacted__') {
+      return UNCONTACTED_STATUSES.includes(n.status);
+    }
     if (status && n.status !== status) return false;
     return true;
   });
@@ -671,7 +808,7 @@ function renderMyNumbers() {
   const pageData = myFilteredNumbers.slice(start, start + PAGE_SIZE);
   const container = document.getElementById('myNumbersList');
   if (!pageData.length) {
-    container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--gray-400)"><i class="fas fa-phone" style="font-size:2rem;margin-bottom:0.5rem;display:block"></i>Nömrə tapılmadı</div>';
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-phone-slash"></i><p>Nömrə tapılmadı</p></div>';
     return;
   }
   let html = '';
@@ -679,7 +816,8 @@ function renderMyNumbers() {
     const statusClass = 'status-' + n.status.replace(/ /g, '-');
     const today = new Date().toISOString().split('T')[0];
     const isOverdue = n.next_contact_date && n.next_contact_date <= today;
-    html += `<div class="number-card ${statusClass}" id="card-${n.id}">
+    const isUncontacted = UNCONTACTED_STATUSES.includes(n.status);
+    html += `<div class="number-card ${statusClass}${isUncontacted ? ' uncontacted' : ''}" id="card-${n.id}">
       <div class="number-card-header" onclick="toggleCardExtra('${n.id}')">
         <span class="number-card-phone"><i class="fas fa-phone" style="font-size:0.8rem;opacity:0.6;margin-right:0.35rem"></i>${escHtml(n.phone_display)}</span>
         <div class="number-card-meta">
@@ -689,6 +827,9 @@ function renderMyNumbers() {
         </div>
       </div>
       <div class="number-card-actions">
+        <a href="tel:${n.phone}" class="btn btn-outline btn-sm call-btn">
+          <i class="fas fa-phone"></i> Zəng
+        </a>
         <a href="https://wa.me/994${waPhone(n.phone)}" target="_blank" class="btn btn-whatsapp btn-sm" onclick="logAction('${n.id}','WhatsApp-dan əlaqə saxladı')">
           <i class="fab fa-whatsapp"></i> WhatsApp
         </a>
@@ -750,10 +891,8 @@ function statusBtnClass(status) {
 async function changeStatus(phoneId, newStatus) {
   const { error } = await sb.from('phone_numbers').update({ status: newStatus }).eq('id', phoneId);
   if (error) { showToast(error.message, 'error'); return; }
-  // Log
   await logAction(phoneId, `Status dəyişdirildi: ${newStatus}`);
   showToast(`Status: ${newStatus}`, 'success');
-  // Update local state
   const idx = myNumbers.findIndex(n => n.id === phoneId);
   if (idx !== -1) myNumbers[idx].status = newStatus;
   applyWorkerFilters();
@@ -786,9 +925,7 @@ async function saveNextDate(phoneId) {
   const date = document.getElementById('nextDate-' + phoneId).value;
   const { error } = await sb.from('phone_numbers').update({ next_contact_date: date || null }).eq('id', phoneId);
   if (error) { showToast(error.message, 'error'); return; }
-  if (date) {
-    await logAction(phoneId, `Növbəti əlaqə tarixi: ${formatDate(date)}`);
-  }
+  if (date) await logAction(phoneId, `Növbəti əlaqə tarixi: ${formatDate(date)}`);
   showToast('Tarix saxlandı!', 'success');
   const idx = myNumbers.findIndex(n => n.id === phoneId);
   if (idx !== -1) myNumbers[idx].next_contact_date = date || null;
@@ -887,6 +1024,7 @@ async function openNumberDetail(phoneId) {
       </div>
       ${canEdit ? `
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <a href="tel:${phone.phone}" class="btn btn-outline btn-sm"><i class="fas fa-phone"></i> Zəng et</a>
         <a href="https://wa.me/994${waPhone(phone.phone)}" target="_blank" class="btn btn-whatsapp btn-sm"><i class="fab fa-whatsapp"></i> WhatsApp</a>
         ${isAdmin ? `<div style="display:flex;gap:0.5rem;flex:1;min-width:200px">
           <select id="detailStatus" style="flex:1;padding:0.4rem;border:1px solid var(--gray-200);border-radius:var(--radius)">
@@ -962,7 +1100,6 @@ function switchTab(el, tabId) {
 // ASSIGN MODAL (Admin quick assign)
 // ============================================================
 function openAssignModal(phoneId, phoneDisplay) {
-  // Build inline assign dropdown
   let wOpts = allWorkers.map(w => `<option value="${w.id}">${escHtml(w.full_name || w.email)}</option>`).join('');
   const confirmed = () => {
     const sel = document.getElementById('quickAssignWorker');
@@ -999,6 +1136,13 @@ function showConfirm(message, onOk, title = 'Təsdiq') {
   openModal('modalConfirm');
 }
 
+// Close modals on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
 // ============================================================
 // PAGINATION
 // ============================================================
@@ -1033,11 +1177,10 @@ function normalizePhone(raw) {
   if (p.startsWith('994')) p = p.slice(3);
   if (p.startsWith('0')) p = p.slice(1);
   if (p.length !== 9) return null;
-  return '0' + p; // store as 10 digits: 0XXXXXXXXX
+  return '0' + p;
 }
 
 function formatPhoneDisplay(normalized) {
-  // 0551234567 → 055 123 45 67
   if (normalized.length === 10) {
     return `${normalized.slice(0,3)} ${normalized.slice(3,6)} ${normalized.slice(6,8)} ${normalized.slice(8,10)}`;
   }
@@ -1045,7 +1188,6 @@ function formatPhoneDisplay(normalized) {
 }
 
 function waPhone(phone) {
-  // Remove leading 0 for WhatsApp
   let p = phone.replace(/\D/g,'');
   if (p.startsWith('0')) p = p.slice(1);
   return p;
@@ -1082,7 +1224,7 @@ function showToast(msg, type = 'success') {
   el.textContent = msg;
   el.className = 'toast show ' + type;
   clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => { el.className = 'toast'; }, 3000);
+  toastTimeout = setTimeout(() => { el.className = 'toast'; }, 3500);
 }
 
 // Close dropdowns on outside click
@@ -1092,3 +1234,10 @@ document.addEventListener('click', (e) => {
     if (dd) dd.innerHTML = '';
   }
 });
+
+// Service Worker Registration for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

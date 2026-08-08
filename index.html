@@ -2,9 +2,19 @@
 <html lang="az">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CRM — Telefon Nömrələri</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Menora CRM" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="description" content="Menora Nömrələr CRM Sistemi" />
+  <title>Menora Nömrələr</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -12,29 +22,37 @@
 
 <!-- ======================== LOGIN PAGE ======================== -->
 <div id="loginPage" class="page active">
-  <div class="login-container">
-    <div class="login-logo">
-      <i class="fas fa-phone-volume"></i>
-      <h1>CRM Sistemi</h1>
-      <p>Telefon Nömrələri İdarəetmə</p>
-    </div>
-    <div class="login-form card">
-      <h2>Daxil ol</h2>
-      <div class="form-group">
-        <label><i class="fas fa-envelope"></i> E-poçt</label>
-        <input type="email" id="loginEmail" placeholder="e-poçtunuzu daxil edin" />
+  <div class="login-bg">
+    <div class="login-particles"></div>
+    <div class="login-container">
+      <div class="login-logo">
+        <div class="login-logo-icon">
+          <img src="logo.png" alt="Menora Logo" id="logoImg" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'" />
+          <div id="logoFallback" class="logo-fallback" style="display:none"><i class="fas fa-phone-volume"></i></div>
+        </div>
+        <h1>Menora Nömrələr</h1>
+        <p>CRM İdarəetmə Sistemi</p>
       </div>
-      <div class="form-group">
-        <label><i class="fas fa-lock"></i> Şifrə</label>
-        <div class="input-eye">
-          <input type="password" id="loginPassword" placeholder="şifrənizi daxil edin" />
-          <button type="button" class="eye-btn" onclick="togglePass()"><i class="fas fa-eye" id="eyeIcon"></i></button>
+      <div class="login-form">
+        <div class="login-form-inner">
+          <h2><i class="fas fa-sign-in-alt"></i> Daxil ol</h2>
+          <div class="form-group">
+            <label><i class="fas fa-envelope"></i> E-poçt</label>
+            <input type="email" id="loginEmail" placeholder="E-poçtunuzu daxil edin" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-lock"></i> Şifrə</label>
+            <div class="input-eye">
+              <input type="password" id="loginPassword" placeholder="Şifrənizi daxil edin" autocomplete="current-password" />
+              <button type="button" class="eye-btn" onclick="togglePass()"><i class="fas fa-eye" id="eyeIcon"></i></button>
+            </div>
+          </div>
+          <div id="loginError" class="error-msg"></div>
+          <button class="btn btn-primary btn-full" onclick="doLogin()" id="loginBtn">
+            <i class="fas fa-sign-in-alt"></i> Daxil ol
+          </button>
         </div>
       </div>
-      <div id="loginError" class="error-msg"></div>
-      <button class="btn btn-primary btn-full" onclick="doLogin()" id="loginBtn">
-        <i class="fas fa-sign-in-alt"></i> Daxil ol
-      </button>
     </div>
   </div>
 </div>
@@ -45,37 +63,40 @@
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <i class="fas fa-phone-volume"></i>
-      <span>CRM Sistemi</span>
+      <div class="sidebar-logo">
+        <img src="logo.png" alt="Logo" class="sidebar-logo-img" onerror="this.style.display='none';document.getElementById('sidebarLogoFallback').style.display='flex'" />
+        <div id="sidebarLogoFallback" class="sidebar-logo-fallback" style="display:none"><i class="fas fa-phone-volume"></i></div>
+      </div>
+      <span>Menora Nömrələr</span>
     </div>
     <nav class="sidebar-nav">
       <!-- Admin only -->
-      <a href="#" class="nav-item admin-only active" data-page="dashboard" onclick="showSection('dashboard')">
+      <a class="nav-item admin-only" data-page="dashboard" onclick="showSection('dashboard');return false;" href="javascript:void(0)">
         <i class="fas fa-chart-pie"></i> Dashboard
       </a>
-      <a href="#" class="nav-item admin-only" data-page="numbers" onclick="showSection('numbers')">
+      <a class="nav-item admin-only" data-page="numbers" onclick="showSection('numbers');return false;" href="javascript:void(0)">
         <i class="fas fa-list"></i> Bütün Nömrələr
       </a>
-      <a href="#" class="nav-item admin-only" data-page="workers" onclick="showSection('workers')">
+      <a class="nav-item admin-only" data-page="workers" onclick="showSection('workers');return false;" href="javascript:void(0)">
         <i class="fas fa-users"></i> İşçilər
       </a>
-      <a href="#" class="nav-item admin-only" data-page="import" onclick="showSection('import')">
+      <a class="nav-item admin-only" data-page="import" onclick="showSection('import');return false;" href="javascript:void(0)">
         <i class="fas fa-file-import"></i> İmport
       </a>
-      <a href="#" class="nav-item admin-only" data-page="distribute" onclick="showSection('distribute')">
+      <a class="nav-item admin-only" data-page="distribute" onclick="showSection('distribute');return false;" href="javascript:void(0)">
         <i class="fas fa-random"></i> Paylaşdır
       </a>
       <!-- Worker only -->
-      <a href="#" class="nav-item worker-only active" data-page="myNumbers" onclick="showSection('myNumbers')">
+      <a class="nav-item worker-only" data-page="myNumbers" onclick="showSection('myNumbers');return false;" href="javascript:void(0)">
         <i class="fas fa-phone"></i> Nömrələrim
       </a>
-      <a href="#" class="nav-item worker-only" data-page="reminders" onclick="showSection('reminders')">
+      <a class="nav-item worker-only" data-page="reminders" onclick="showSection('reminders');return false;" href="javascript:void(0)">
         <i class="fas fa-bell"></i> Xatırlatmalar
       </a>
     </nav>
     <div class="sidebar-footer">
       <div class="user-info" id="userInfoSidebar"></div>
-      <button class="btn btn-ghost btn-sm" onclick="doLogout()">
+      <button class="btn btn-ghost btn-sm sidebar-logout" onclick="doLogout()">
         <i class="fas fa-sign-out-alt"></i> Çıxış
       </button>
     </div>
@@ -90,8 +111,11 @@
       <button class="hamburger" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
       <div class="top-bar-title" id="topBarTitle">Dashboard</div>
       <div class="top-bar-actions">
+        <button class="btn btn-refresh btn-sm" id="refreshBtn" onclick="refreshCurrentSection()" title="Yenilə">
+          <i class="fas fa-sync-alt"></i>
+        </button>
         <span id="topUserName" class="user-badge"></span>
-        <button class="btn btn-ghost btn-sm" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="btn btn-ghost btn-sm topbar-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i></button>
       </div>
     </header>
 
@@ -99,7 +123,7 @@
     <section id="sectionDashboard" class="content-section">
       <div class="section-header">
         <h2><i class="fas fa-chart-pie"></i> Dashboard</h2>
-        <button class="btn btn-outline btn-sm" onclick="loadDashboard()"><i class="fas fa-sync"></i> Yenilə</button>
+        <button class="btn btn-outline btn-sm" onclick="loadDashboard()"><i class="fas fa-sync-alt"></i> Yenilə</button>
       </div>
 
       <!-- Reminders Alert -->
@@ -154,7 +178,10 @@
     <section id="sectionNumbers" class="content-section hidden">
       <div class="section-header">
         <h2><i class="fas fa-list"></i> Bütün Nömrələr</h2>
-        <button class="btn btn-primary btn-sm" onclick="openAddNumberModal()"><i class="fas fa-plus"></i> Əlavə et</button>
+        <div class="section-header-actions">
+          <button class="btn btn-outline btn-sm" onclick="loadAdminNumbers()"><i class="fas fa-sync-alt"></i> Yenilə</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddNumberModal()"><i class="fas fa-plus"></i> Əlavə et</button>
+        </div>
       </div>
       <div class="filters-bar">
         <div class="filter-group">
@@ -174,10 +201,10 @@
           </select>
         </div>
         <div class="filter-group">
-          <input type="date" id="filterDateFrom" onchange="applyAdminFilters()" placeholder="Tarixdən" />
+          <input type="date" id="filterDateFrom" onchange="applyAdminFilters()" />
         </div>
         <div class="filter-group">
-          <input type="date" id="filterDateTo" onchange="applyAdminFilters()" placeholder="Tarixə qədər" />
+          <input type="date" id="filterDateTo" onchange="applyAdminFilters()" />
         </div>
       </div>
       <div class="card">
@@ -192,7 +219,10 @@
     <section id="sectionWorkers" class="content-section hidden">
       <div class="section-header">
         <h2><i class="fas fa-users"></i> İşçilər</h2>
-        <button class="btn btn-primary btn-sm" onclick="openAddWorkerModal()"><i class="fas fa-user-plus"></i> İşçi Əlavə et</button>
+        <div class="section-header-actions">
+          <button class="btn btn-outline btn-sm" onclick="loadWorkers()"><i class="fas fa-sync-alt"></i> Yenilə</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddWorkerModal()"><i class="fas fa-user-plus"></i> İşçi Əlavə et</button>
+        </div>
       </div>
       <div class="card">
         <div id="workersTable" class="table-wrapper">
@@ -241,7 +271,7 @@
       <div class="distribute-grid">
         <div class="card">
           <div class="card-header"><h3><i class="fas fa-magic"></i> Avtomatik Random Paylaşdırma</h3></div>
-          <p class="text-muted">Paylashdirilmamış nömrələr işçilər arasında bərabər şəkildə random paylaşdırılacaq.</p>
+          <p class="text-muted">Paylaşdırılmamış nömrələr işçilər arasında bərabər şəkildə random paylaşdırılacaq.</p>
           <div class="distribute-info" id="distributeInfo">
             <div class="loading"><i class="fas fa-spinner fa-spin"></i> Yüklənir...</div>
           </div>
@@ -253,8 +283,10 @@
           <div class="card-header"><h3><i class="fas fa-hand-pointer"></i> Əl ilə Təyin et</h3></div>
           <div class="form-group">
             <label>Nömrə</label>
-            <input type="text" id="manualPhone" placeholder="Nömrə daxil edin..." oninput="searchPhoneForManual()" />
-            <div id="phoneSearchResults" class="search-dropdown"></div>
+            <div style="position:relative">
+              <input type="text" id="manualPhone" placeholder="Nömrə daxil edin..." oninput="searchPhoneForManual()" />
+              <div id="phoneSearchResults" class="search-dropdown"></div>
+            </div>
           </div>
           <div class="form-group">
             <label>İşçi</label>
@@ -271,7 +303,10 @@
     <section id="sectionMyNumbers" class="content-section hidden">
       <div class="section-header">
         <h2><i class="fas fa-phone"></i> Nömrələrim</h2>
-        <span id="myNumbersCount" class="badge badge-primary">0</span>
+        <div class="section-header-actions">
+          <span id="myNumbersCount" class="badge badge-primary">0</span>
+          <button class="btn btn-outline btn-sm" onclick="loadMyNumbers()"><i class="fas fa-sync-alt"></i> Yenilə</button>
+        </div>
       </div>
       <!-- Reminders -->
       <div id="workerReminders" class="reminders-alert" style="display:none"></div>
@@ -283,6 +318,7 @@
         <div class="filter-group">
           <select id="myFilterStatus" onchange="applyWorkerFilters()">
             <option value="">Bütün statuslar</option>
+            <option value="__uncontacted__">🔴 Əlaqə qurulmamış</option>
             <option>Yeni</option><option>Danışılır</option><option>Cavab vermədi</option>
             <option>Nömrə işləmir</option><option>Razı olmadı</option>
             <option>Gələcəkdə ala bilər</option><option>Maraqlanır</option><option>Müştəri oldu</option>
@@ -299,6 +335,7 @@
     <section id="sectionReminders" class="content-section hidden">
       <div class="section-header">
         <h2><i class="fas fa-bell"></i> Xatırlatmalar</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadReminders()"><i class="fas fa-sync-alt"></i> Yenilə</button>
       </div>
       <div id="remindersList" class="card">
         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Yüklənir...</div>
@@ -306,6 +343,21 @@
     </section>
 
   </main>
+</div>
+
+<!-- PWA Install Banner -->
+<div id="pwaInstallBanner" class="pwa-banner" style="display:none">
+  <div class="pwa-banner-content">
+    <div class="pwa-banner-icon"><img src="icon-192.png" alt="App" /></div>
+    <div class="pwa-banner-text">
+      <strong>Menora Nömrələr</strong>
+      <span>Telefona yükləyin</span>
+    </div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button class="btn btn-primary btn-sm" onclick="installPWA()"><i class="fas fa-download"></i> Yüklə</button>
+    <button class="btn btn-ghost btn-sm" onclick="dismissPWABanner()"><i class="fas fa-times"></i></button>
+  </div>
 </div>
 
 <!-- ======================== MODALS ======================== -->
@@ -329,7 +381,7 @@
   <div class="modal-backdrop" onclick="closeModal('modalAddNumber')"></div>
   <div class="modal-content">
     <div class="modal-header">
-      <h3>Yeni Nömrə Əlavə et</h3>
+      <h3><i class="fas fa-plus-circle"></i> Yeni Nömrə Əlavə et</h3>
       <button class="modal-close" onclick="closeModal('modalAddNumber')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
@@ -351,7 +403,7 @@
   <div class="modal-backdrop" onclick="closeModal('modalAddWorker')"></div>
   <div class="modal-content">
     <div class="modal-header">
-      <h3>Yeni İşçi Əlavə et</h3>
+      <h3><i class="fas fa-user-plus"></i> Yeni İşçi Əlavə et</h3>
       <button class="modal-close" onclick="closeModal('modalAddWorker')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
@@ -371,7 +423,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modalAddWorker')">Ləğv et</button>
-      <button class="btn btn-primary" onclick="doAddWorker()"><i class="fas fa-user-plus"></i> Əlavə et</button>
+      <button class="btn btn-primary" id="addWorkerBtn" onclick="doAddWorker()"><i class="fas fa-user-plus"></i> Əlavə et</button>
     </div>
   </div>
 </div>
